@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:adhan/adhan.dart';
+import 'package:flutter_svg/svg.dart';
 import 'package:intl/intl.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
@@ -351,17 +352,65 @@ class _PrayerTimesPageState extends State<PrayerTimesPage> {
                   child: SingleChildScrollView(
                     child: Column(
                       children: [
-                        _buildPrayerRow('الفجر', _prayerTimes!.fajr, '☀️'),
+                        _buildPrayerRow(
+                          'الفجر',
+                          _prayerTimes!.fajr,
+                          SvgPicture.asset(
+                            'assets/data/svgIcons/Fajr.svg',
+                            width: 28,
+                            height: 28,
+                          ),
+                        ),
                         const Divider(height: 1),
-                        _buildPrayerRow('الشروق', _prayerTimes!.sunrise, '🌅'),
+                        _buildPrayerRow(
+                          'الشروق',
+                          _prayerTimes!.sunrise,
+                          SvgPicture.asset(
+                            'assets/data/svgIcons/Duha.svg',
+                            width: 28,
+                            height: 28,
+                          ),
+                        ),
                         const Divider(height: 1),
-                        _buildPrayerRow('الظهر', _prayerTimes!.dhuhr, '☀️'),
+                        _buildPrayerRow(
+                          'الظهر',
+                          _prayerTimes!.dhuhr,
+                          SvgPicture.asset(
+                            'assets/data/svgIcons/Dhuhr.svg',
+                            width: 28,
+                            height: 28,
+                          ),
+                        ),
                         const Divider(height: 1),
-                        _buildPrayerRow('العصر', _prayerTimes!.asr, '🌤️'),
+                        _buildPrayerRow(
+                          'العصر',
+                          _prayerTimes!.asr,
+                          SvgPicture.asset(
+                            'assets/data/svgIcons/Asr.svg',
+                            width: 28,
+                            height: 28,
+                          ),
+                        ),
                         const Divider(height: 1),
-                        _buildPrayerRow('المغرب', _prayerTimes!.maghrib, '🌅'),
+                        _buildPrayerRow(
+                          'المغرب',
+                          _prayerTimes!.maghrib,
+                          SvgPicture.asset(
+                            'assets/data/svgIcons/Maghrib.svg',
+                            width: 28,
+                            height: 28,
+                          ),
+                        ),
                         const Divider(height: 1),
-                        _buildPrayerRow('العشاء', _prayerTimes!.isha, '🌙'),
+                        _buildPrayerRow(
+                          'العشاء',
+                          _prayerTimes!.isha,
+                          SvgPicture.asset(
+                            'assets/data/svgIcons/Isha.svg',
+                            width: 28,
+                            height: 28,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -416,14 +465,15 @@ class _PrayerTimesPageState extends State<PrayerTimesPage> {
     );
   }
 
-  Widget _buildPrayerRow(String name, DateTime time, String icon) {
+  Widget _buildPrayerRow(String name, DateTime time, Widget icon) {
     final isNext = name == _nextPrayer;
+
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 10),
       color: isNext ? Colors.green.shade50 : Colors.transparent,
       child: Row(
         children: [
-          Text(icon, style: const TextStyle(fontSize: 28)),
+          SizedBox(width: 28, height: 28, child: icon),
           const SizedBox(width: 15),
           Expanded(
             child: Text(
