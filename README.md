@@ -1,16 +1,39 @@
-# flutter_application_1
+# 📿 Azkar & Quran App
 
-A new Flutter project.
+A mobile application built with **Flutter** that helps users read daily Azkar and the Holy Quran through a clean, simple, and user-friendly interface.
 
-## Getting Started
+---
 
-This project is a starting point for a Flutter application.
+## ✨ Features
+- 📖 Read the Holy Quran with clear and comfortable text
+- 📿 Daily Azkar:
+  - Morning Azkar
+  - Evening Azkar
+  - After Prayer Azkar
+  - Sleep Azkar
+- 🔍 Easy navigation between Azkar categories
+- 🎨 Simple and elegant UI
+- 📱 Responsive design for different screen sizes
 
-A few resources to get you started if this is your first Flutter project:
+---
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+## 🛠️ Technologies Used
+- Flutter
+- Dart
+- Material Design
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+---
+
+## 🎯 Purpose of the App
+This project was developed to:
+- Improve Flutter and mobile development skills
+- Practice building real-world applications
+- Provide a useful Islamic app for daily use
+
+---
+
+## 📌 Screenshots
+<img width="1200" height="630" alt="image" src="https://github.com/user-attachments/assets/d66d7447-5de8-4745-988b-5168e2dd75b6" />
+
+
+
