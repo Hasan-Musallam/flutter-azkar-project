@@ -21,10 +21,10 @@ class IslamicDataService {
     try {
       // Initialize Quran data
       await _loadQuranData();
-      
+
       // Initialize Adhkar data
       await _loadAdhkarData();
-      
+
       // Initialize Prayer times
       await _loadPrayerTimes();
     } catch (e) {
@@ -53,21 +53,25 @@ class IslamicDataService {
         {'id': 'travel', 'name': 'Travel Adhkar', 'arabic': 'أذكار السفر'},
         {'id': 'eating', 'name': 'Eating Adhkar', 'arabic': 'أذكار الطعام'},
       ];
-      
+
       _adhkarItems = [
         {
           'id': '1',
           'category': 'morning',
           'title': 'Morning Dhikr',
-          'arabicText': 'أَصْبَحْنَا وَأَصْبَحَ الْمُلْكُ لِلَّهِ ۖ وَالْحَمْدُ لِلَّهِ',
-          'translation': 'We have reached the morning and at this very time unto Allah belongs all sovereignty, and all praise is for Allah.',
+          'arabicText':
+              'أَصْبَحْنَا وَأَصْبَحَ الْمُلْكُ لِلَّهِ ۖ وَالْحَمْدُ لِلَّهِ',
+          'translation':
+              'We have reached the morning and at this very time unto Allah belongs all sovereignty, and all praise is for Allah.',
         },
         {
           'id': '2',
           'category': 'evening',
           'title': 'Evening Dhikr',
-          'arabicText': 'أَمْسَيْنَا وَأَمْسَى الْمُلْكُ لِلَّهِ ۖ وَالْحَمْدُ لِلَّهِ',
-          'translation': 'We have reached the evening and at this very time unto Allah belongs all sovereignty, and all praise is for Allah.',
+          'arabicText':
+              'أَمْسَيْنَا وَأَمْسَى الْمُلْكُ لِلَّهِ ۖ وَالْحَمْدُ لِلَّهِ',
+          'translation':
+              'We have reached the evening and at this very time unto Allah belongs all sovereignty, and all praise is for Allah.',
         },
       ];
     } catch (e) {
@@ -102,12 +106,16 @@ class IslamicDataService {
   }
 
   static List<dynamic> getAyahsForSurah(int surahNumber) {
-    return _ayahs?.where((ayah) => ayah['surahNumber'] == surahNumber).toList() ?? [];
+    return _ayahs
+            ?.where((ayah) => ayah['surahNumber'] == surahNumber)
+            .toList() ??
+        [];
   }
 
   static dynamic getAyah(int surahNumber, int ayahNumber) {
     return _ayahs?.firstWhere(
-      (ayah) => ayah['surahNumber'] == surahNumber && ayah['number'] == ayahNumber,
+      (ayah) =>
+          ayah['surahNumber'] == surahNumber && ayah['number'] == ayahNumber,
       orElse: () => null,
     );
   }
@@ -116,11 +124,15 @@ class IslamicDataService {
     return _translations ?? [];
   }
 
-  static dynamic getTranslation(int surahNumber, int ayahNumber, String language) {
+  static dynamic getTranslation(
+    int surahNumber,
+    int ayahNumber,
+    String language,
+  ) {
     return _translations?.firstWhere(
-      (translation) => 
-          translation['surahNumber'] == surahNumber && 
-          translation['ayahNumber'] == ayahNumber && 
+      (translation) =>
+          translation['surahNumber'] == surahNumber &&
+          translation['ayahNumber'] == ayahNumber &&
           translation['language'] == language,
       orElse: () => null,
     );
@@ -132,50 +144,75 @@ class IslamicDataService {
   }
 
   static List<Map<String, dynamic>> getAdhkarItemsForCategory(String category) {
-    return _adhkarItems?.where((item) => item['category'] == category).toList() ?? [];
+    return _adhkarItems
+            ?.where((item) => item['category'] == category)
+            .toList() ??
+        [];
   }
 
   static List<Map<String, dynamic>> getMorningAdhkar() {
-    return _adhkarItems?.where((item) => item['category'] == 'morning').toList() ?? [];
+    return _adhkarItems
+            ?.where((item) => item['category'] == 'morning')
+            .toList() ??
+        [];
   }
 
   static List<Map<String, dynamic>> getEveningAdhkar() {
-    return _adhkarItems?.where((item) => item['category'] == 'evening').toList() ?? [];
+    return _adhkarItems
+            ?.where((item) => item['category'] == 'evening')
+            .toList() ??
+        [];
   }
 
   static List<Map<String, dynamic>> getPrayerAdhkar() {
-    return _adhkarItems?.where((item) => item['category'] == 'prayer').toList() ?? [];
+    return _adhkarItems
+            ?.where((item) => item['category'] == 'prayer')
+            .toList() ??
+        [];
   }
 
   static List<Map<String, dynamic>> getSleepAdhkar() {
-    return _adhkarItems?.where((item) => item['category'] == 'sleep').toList() ?? [];
+    return _adhkarItems
+            ?.where((item) => item['category'] == 'sleep')
+            .toList() ??
+        [];
   }
 
   static List<Map<String, dynamic>> getTravelAdhkar() {
-    return _adhkarItems?.where((item) => item['category'] == 'travel').toList() ?? [];
+    return _adhkarItems
+            ?.where((item) => item['category'] == 'travel')
+            .toList() ??
+        [];
   }
 
   static List<Map<String, dynamic>> getEatingAdhkar() {
-    return _adhkarItems?.where((item) => item['category'] == 'eating').toList() ?? [];
+    return _adhkarItems
+            ?.where((item) => item['category'] == 'eating')
+            .toList() ??
+        [];
   }
 
   // Search methods
   static List<dynamic> searchQuran(String query) {
     if (_ayahs == null) return [];
-    
+
     return _ayahs!.where((ayah) {
-      return ayah['arabicText']?.toLowerCase().contains(query.toLowerCase()) == true ||
-             ayah['translation']?.toLowerCase().contains(query.toLowerCase()) == true;
+      return ayah['arabicText']?.toLowerCase().contains(query.toLowerCase()) ==
+              true ||
+          ayah['translation']?.toLowerCase().contains(query.toLowerCase()) ==
+              true;
     }).toList();
   }
 
   static List<Map<String, dynamic>> searchAdhkar(String query) {
     if (_adhkarItems == null) return [];
-    
+
     return _adhkarItems!.where((item) {
-      return item['arabicText']?.toLowerCase().contains(query.toLowerCase()) == true ||
-             item['translation']?.toLowerCase().contains(query.toLowerCase()) == true ||
-             item['title']?.toLowerCase().contains(query.toLowerCase()) == true;
+      return item['arabicText']?.toLowerCase().contains(query.toLowerCase()) ==
+              true ||
+          item['translation']?.toLowerCase().contains(query.toLowerCase()) ==
+              true ||
+          item['title']?.toLowerCase().contains(query.toLowerCase()) == true;
     }).toList();
   }
 
@@ -186,7 +223,7 @@ class IslamicDataService {
 
   static Map<String, dynamic>? getNextPrayer() {
     final now = DateTime.now();
-    
+
     final todayPrayers = _prayerTimes?.where((prayer) {
       final prayerTime = DateTime(
         now.year,
@@ -197,14 +234,17 @@ class IslamicDataService {
       );
       return prayerTime.isAfter(now);
     }).toList();
-    
+
     return todayPrayers?.isNotEmpty == true ? todayPrayers!.first : null;
   }
 
   // Popular surahs
   static List<dynamic> getPopularSurahs() {
     final popularNumbers = [1, 2, 18, 36, 55, 67, 78, 112, 113, 114];
-    return _surahs?.where((surah) => popularNumbers.contains(surah['number'])).toList() ?? [];
+    return _surahs
+            ?.where((surah) => popularNumbers.contains(surah['number']))
+            .toList() ??
+        [];
   }
 
   // Juz information
@@ -215,11 +255,11 @@ class IslamicDataService {
   // Verse of the day
   static dynamic getVerseOfTheDay() {
     if (_ayahs == null || _ayahs!.isEmpty) return null;
-    
+
     final today = DateTime.now();
     final dayOfYear = today.difference(DateTime(today.year, 1, 1)).inDays;
     final index = dayOfYear % _ayahs!.length;
-    
+
     return _ayahs![index];
   }
 }

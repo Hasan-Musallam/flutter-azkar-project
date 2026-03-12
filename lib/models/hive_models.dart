@@ -88,10 +88,12 @@ class HiveUserProgress extends HiveObject {
     this.lastReadSurah = 'Al-Fatihah',
     this.lastReadVerse = 1,
     this.lastReadSurahNumber = 1,
-    this.dailyAdhkar = const {},
+    Map<String, bool>? dailyAdhkar,
     DateTime? lastActivityDate,
-    this.weeklyProgress = const {},
-  }) : lastActivityDate = lastActivityDate ?? DateTime.now();
+    Map<String, int>? weeklyProgress,
+  }) : dailyAdhkar = dailyAdhkar ?? {},
+       weeklyProgress = weeklyProgress ?? {},
+       lastActivityDate = lastActivityDate ?? DateTime.now();
 
   get values => null;
 }

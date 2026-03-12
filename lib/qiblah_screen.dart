@@ -46,56 +46,130 @@ class _QiblahScreenState extends State<QiblahScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('اتجاه القبلة'), centerTitle: true),
-      body: StreamBuilder<LocationStatus>(
-        stream: stream,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: isDark
+                ? [const Color(0xFF0F172A), const Color(0xFF1E293B)]
+                : [const Color(0xFFF0FDFA), const Color(0xFFCCFBF1)],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // App bar
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: Icon(
+                        Icons.arrow_back_ios_rounded,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      'اتجاه القبلة',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Amiri',
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    ),
+                    const Spacer(),
+                    const SizedBox(width: 48),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: StreamBuilder<LocationStatus>(
+                  stream: stream,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
 
-          if (snapshot.hasError) {
-            return _buildErrorWidget('حدث خطأ غير متوقع');
-          }
+                    if (snapshot.hasError) {
+                      return _buildErrorWidget('حدث خطأ غير متوقع', isDark);
+                    }
 
-          final data = snapshot.data;
-          if (data == null) {
-            return const Center(child: CircularProgressIndicator());
-          }
+                    final data = snapshot.data;
+                    if (data == null) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
 
-          if (data.enabled) {
-            switch (data.status) {
-              case LocationPermission.always:
-              case LocationPermission.whileInUse:
-                return const _QiblahCompassWidget();
-              case LocationPermission.denied:
-                return _buildErrorWidget('تم رفض إذن الموقع', showRetry: true);
-              case LocationPermission.deniedForever:
-                return _buildErrorWidget(
-                  'تم رفض إذن الموقع بشكل دائم.\nيرجى تفعيله من الإعدادات.',
-                  showRetry: true,
-                );
-              default:
-                return const SizedBox();
-            }
-          } else {
-            return _buildErrorWidget('يرجى تفعيل خدمة الموقع', showRetry: true);
-          }
-        },
+                    if (data.enabled) {
+                      switch (data.status) {
+                        case LocationPermission.always:
+                        case LocationPermission.whileInUse:
+                          return const _QiblahCompassWidget();
+                        case LocationPermission.denied:
+                          return _buildErrorWidget(
+                            'تم رفض إذن الموقع',
+                            isDark,
+                            showRetry: true,
+                          );
+                        case LocationPermission.deniedForever:
+                          return _buildErrorWidget(
+                            'تم رفض إذن الموقع بشكل دائم.\nيرجى تفعيله من الإعدادات.',
+                            isDark,
+                            showRetry: true,
+                          );
+                        default:
+                          return const SizedBox();
+                      }
+                    } else {
+                      return _buildErrorWidget(
+                        'يرجى تفعيل خدمة الموقع',
+                        isDark,
+                        showRetry: true,
+                      );
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildErrorWidget(String message, {bool showRetry = false}) {
+  Widget _buildErrorWidget(
+    String message,
+    bool isDark, {
+    bool showRetry = false,
+  }) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.location_off, size: 64, color: Colors.grey),
-            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? Colors.white.withOpacity(0.08)
+                    : const Color(0xFF0D9488).withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.location_off_rounded,
+                size: 48,
+                color: isDark ? Colors.white70 : const Color(0xFF0D9488),
+              ),
+            ),
+            const SizedBox(height: 20),
             Text(
               message,
               textAlign: TextAlign.center,
@@ -105,17 +179,17 @@ class _QiblahScreenState extends State<QiblahScreen> {
               const SizedBox(height: 24),
               ElevatedButton.icon(
                 onPressed: _checkLocationStatus,
-                icon: const Icon(Icons.refresh),
+                icon: const Icon(Icons.refresh_rounded),
                 label: const Text('إعادة المحاولة'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF10B981),
+                  backgroundColor: const Color(0xFF0D9488),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 24,
                     vertical: 12,
                   ),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                 ),
               ),
@@ -131,8 +205,19 @@ class _QiblahScreenState extends State<QiblahScreen> {
 class _QiblahCompassWidget extends StatelessWidget {
   const _QiblahCompassWidget();
 
+  String _getDirectionStatus(double qiblahOffset) {
+    final absOffset = qiblahOffset.abs();
+    if (absOffset <= 3) return '✅ أنت في اتجاه القبلة!';
+    if (absOffset <= 10) return '🔥 قريب جداً! استمر';
+    if (absOffset <= 30) return 'حرّك الهاتف قليلاً';
+    return 'حرّك هاتفك لتحديد اتجاه القبلة';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return StreamBuilder<QiblahDirection>(
       stream: FlutterQiblah.qiblahStream,
       builder: (_, AsyncSnapshot<QiblahDirection> snapshot) {
@@ -145,76 +230,137 @@ class _QiblahCompassWidget extends StatelessWidget {
         }
 
         final qiblahDirection = snapshot.data!;
-        final theme = Theme.of(context);
+        final qiblahOffset = qiblahDirection.qiblah;
+        final isAligned = qiblahOffset.abs() <= 3;
 
-        return Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 400),
-                curve: Curves.easeInOut,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(shape: BoxShape.circle),
-                child: SvgPicture.asset(
-                  'assets/data/svgIcons/mecca.svg',
-                  width: 100,
-                  height: 100,
+        return Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Mecca icon
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isAligned
+                    ? const Color(0xFF10B981).withOpacity(0.15)
+                    : Colors.transparent,
+              ),
+              child: SvgPicture.asset(
+                'assets/data/svgIcons/mecca.svg',
+                width: 80,
+                height: 80,
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Status text
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              child: Text(
+                _getDirectionStatus(qiblahOffset),
+                key: ValueKey<String>(_getDirectionStatus(qiblahOffset)),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: isAligned ? FontWeight.bold : FontWeight.normal,
+                  color: isAligned
+                      ? const Color(0xFF10B981)
+                      : theme.colorScheme.onSurface.withOpacity(0.6),
                 ),
               ),
-              const SizedBox(height: 16),
-              Text(
-                'حرّك هاتفك لتحديد اتجاه القبلة',
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: theme.colorScheme.onSurface.withOpacity(0.6),
-                ),
-              ),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: 280,
-                height: 280,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // Compass dial
-                    Transform.rotate(
-                      angle: qiblahDirection.direction * (pi / 180) * -1,
-                      child: CustomPaint(
-                        size: const Size(280, 280),
-                        painter: _CompassDialPainter(
-                          cardinalColor: theme.colorScheme.onSurface
-                              .withOpacity(0.7),
-                          tickColor: theme.colorScheme.onSurface.withOpacity(
-                            0.3,
-                          ),
-                          circleColor: theme.colorScheme.onSurface.withOpacity(
-                            0.15,
-                          ),
-                        ),
-                      ),
-                    ),
-                    // Qiblah needle
-                    Transform.rotate(
-                      angle: qiblahDirection.qiblah * (pi / 180) * -1,
-                      child: CustomPaint(
-                        size: const Size(280, 280),
-                        painter: _QiblahNeedlePainter(),
-                      ),
-                    ),
-                    // Center dot
+            ),
+            const SizedBox(height: 32),
+
+            // Compass
+            SizedBox(
+              width: 280,
+              height: 280,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Glow effect when aligned
+                  if (isAligned)
                     Container(
-                      width: 16,
-                      height: 16,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF10B981),
+                      width: 280,
+                      height: 280,
+                      decoration: BoxDecoration(
                         shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF10B981).withOpacity(0.3),
+                            blurRadius: 40,
+                            spreadRadius: 10,
+                          ),
+                        ],
                       ),
                     ),
-                  ],
+                  // Compass dial
+                  Transform.rotate(
+                    angle: qiblahDirection.direction * (pi / 180) * -1,
+                    child: CustomPaint(
+                      size: const Size(280, 280),
+                      painter: _CompassDialPainter(
+                        cardinalColor: isDark
+                            ? Colors.white.withOpacity(0.7)
+                            : theme.colorScheme.onSurface.withOpacity(0.7),
+                        tickColor: isDark
+                            ? Colors.white.withOpacity(0.3)
+                            : theme.colorScheme.onSurface.withOpacity(0.3),
+                        circleColor: isDark
+                            ? Colors.white.withOpacity(0.12)
+                            : theme.colorScheme.onSurface.withOpacity(0.12),
+                      ),
+                    ),
+                  ),
+                  // Qiblah needle
+                  Transform.rotate(
+                    angle: qiblahDirection.qiblah * (pi / 180) * -1,
+                    child: CustomPaint(
+                      size: const Size(280, 280),
+                      painter: _QiblahNeedlePainter(isAligned: isAligned),
+                    ),
+                  ),
+                  // Center dot
+                  Container(
+                    width: 18,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF0D9488), Color(0xFF10B981)],
+                      ),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF10B981).withOpacity(0.4),
+                          blurRadius: 8,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // Degree info
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? Colors.white.withOpacity(0.08)
+                    : const Color(0xFF0D9488).withOpacity(0.08),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Text(
+                '${qiblahDirection.direction.toStringAsFixed(1)}°',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white70 : const Color(0xFF0D9488),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         );
       },
     );
@@ -289,7 +435,6 @@ class _CompassDialPainter extends CustomPainter {
         isCardinal || isMajor ? majorTickPaint : tickPaint,
       );
 
-      // Cardinal labels
       if (isCardinal) {
         final cardinalIndex = i ~/ 90;
         final textPainter = TextPainter(
@@ -322,14 +467,22 @@ class _CompassDialPainter extends CustomPainter {
 
 // ================= Qiblah Needle Painter =================
 class _QiblahNeedlePainter extends CustomPainter {
+  final bool isAligned;
+
+  _QiblahNeedlePainter({this.isAligned = false});
+
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
 
-    // Needle pointing up (towards Qiblah)
+    final needleColor = isAligned
+        ? const Color(0xFF10B981)
+        : const Color(0xFF0D9488);
+
+    // Needle pointing up
     final needlePaint = Paint()
-      ..color = const Color(0xFF10B981)
+      ..color = needleColor
       ..style = PaintingStyle.fill;
 
     final needlePath = Path()
@@ -342,7 +495,7 @@ class _QiblahNeedlePainter extends CustomPainter {
 
     // Kaaba icon circle at tip
     final kaabaPaint = Paint()
-      ..color = const Color(0xFF10B981)
+      ..color = needleColor
       ..style = PaintingStyle.fill;
 
     canvas.drawCircle(
@@ -351,7 +504,7 @@ class _QiblahNeedlePainter extends CustomPainter {
       kaabaPaint,
     );
 
-    // Kaaba symbol (small square)
+    // Kaaba symbol
     final kaabaSquarePaint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.fill;
@@ -367,5 +520,5 @@ class _QiblahNeedlePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

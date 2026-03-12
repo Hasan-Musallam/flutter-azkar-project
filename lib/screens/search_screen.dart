@@ -36,13 +36,17 @@ class _SearchScreenState extends State<SearchScreen> {
 
     final appProvider = Provider.of<AppProvider>(context, listen: false);
     final results = appProvider.searchContent(query);
-    
+
     // Filter results based on selected filter
     List<dynamic> filteredResults = results;
     if (_selectedFilter == 'Quran') {
-      filteredResults = results.where((r) => r.runtimeType.toString().contains('QuranAyah')).toList();
+      filteredResults = results
+          .where((r) => r.runtimeType.toString().contains('QuranAyah'))
+          .toList();
     } else if (_selectedFilter == 'Adhkar') {
-      filteredResults = results.where((r) => r.runtimeType.toString().contains('AdhkarItem')).toList();
+      filteredResults = results
+          .where((r) => r.runtimeType.toString().contains('AdhkarItem'))
+          .toList();
     }
 
     setState(() {
@@ -54,7 +58,7 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Search'),
@@ -120,9 +124,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildBody() {
     if (_isSearching) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (_searchController.text.isEmpty) {
@@ -145,7 +147,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildEmptyState() {
     final theme = Theme.of(context);
-    
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -177,7 +179,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildNoResultsState() {
     final theme = Theme.of(context);
-    
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -209,13 +211,13 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildSearchResultItem(dynamic result) {
     final theme = Theme.of(context);
-    
+
     if (result.runtimeType.toString().contains('QuranAyah')) {
       return _buildQuranResult(result, theme);
     } else if (result.runtimeType.toString().contains('AdhkarItem')) {
       return _buildAdhkarResult(result, theme);
     }
-    
+
     return const SizedBox.shrink();
   }
 
@@ -289,11 +291,7 @@ class _SearchScreenState extends State<SearchScreen> {
             color: const Color(0xFFFEF3C7),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: const Icon(
-            Icons.favorite,
-            color: Color(0xFFF59E0B),
-            size: 20,
-          ),
+          child: const Icon(Icons.favorite, color: Color(0xFFF59E0B), size: 20),
         ),
         title: Text(
           adhkar.title,
@@ -362,20 +360,24 @@ class _FilterChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? theme.colorScheme.primary : theme.colorScheme.surfaceVariant,
+          color: isSelected
+              ? theme.colorScheme.primary
+              : theme.colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? Colors.white : theme.colorScheme.onSurfaceVariant,
+            color: isSelected
+                ? Colors.white
+                : theme.colorScheme.onSurfaceVariant,
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
           ),
         ),

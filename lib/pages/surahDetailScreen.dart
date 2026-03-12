@@ -47,7 +47,8 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('bookmarkedPage', pageNumber);
 
-    final currentSurahNumber = _pages[_currentPageIndex]['start']['surah_number'];
+    final currentSurahNumber =
+        _pages[_currentPageIndex]['start']['surah_number'];
     await prefs.setInt('bookmarkedSurah', currentSurahNumber);
 
     setState(() {
@@ -70,38 +71,41 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
   }
 
   Future<void> _loadPagesData() async {
-  final jsonString = await rootBundle.loadString('assets/pagesQuran.json');
-  final List<dynamic> data = json.decode(jsonString);
+    final jsonString = await rootBundle.loadString('assets/pagesQuran.json');
+    final List<dynamic> data = json.decode(jsonString);
 
-  int initialPageIndex = 0;
+    int initialPageIndex = 0;
 
-  // إذا تم تمرير initialPage، اجعلها البداية
-  if (widget.initialPage != null) {
-    initialPageIndex = data.indexWhere((p) => p['page'] == widget.initialPage);
-    if (initialPageIndex == -1) initialPageIndex = 0;
-  } else {
-    // ابحث عن أول صفحة تحتوي على السورة (في البداية أو النهاية)
-    initialPageIndex = data.indexWhere((p) {
-      final startSurah = p['start']['surah_number'];
-      final endSurah = p['end']['surah_number'];
-      
-      // الصفحة تحتوي على السورة إذا كانت:
-      // 1. السورة المطلوبة تبدأ في هذه الصفحة
-      // 2. أو السورة المطلوبة تنتهي في هذه الصفحة
-      // 3. أو السورة المطلوبة بين بداية ونهاية الصفحة
-      return widget.surahNumber >= startSurah && widget.surahNumber <= endSurah;
+    // إذا تم تمرير initialPage، اجعلها البداية
+    if (widget.initialPage != null) {
+      initialPageIndex = data.indexWhere(
+        (p) => p['page'] == widget.initialPage,
+      );
+      if (initialPageIndex == -1) initialPageIndex = 0;
+    } else {
+      // ابحث عن أول صفحة تحتوي على السورة (في البداية أو النهاية)
+      initialPageIndex = data.indexWhere((p) {
+        final startSurah = p['start']['surah_number'];
+        final endSurah = p['end']['surah_number'];
+
+        // الصفحة تحتوي على السورة إذا كانت:
+        // 1. السورة المطلوبة تبدأ في هذه الصفحة
+        // 2. أو السورة المطلوبة تنتهي في هذه الصفحة
+        // 3. أو السورة المطلوبة بين بداية ونهاية الصفحة
+        return widget.surahNumber >= startSurah &&
+            widget.surahNumber <= endSurah;
+      });
+
+      if (initialPageIndex == -1) initialPageIndex = 0;
+    }
+
+    setState(() {
+      _pages = data;
+      _isLoading = false;
+      _pageController = PageController(initialPage: initialPageIndex);
+      _currentPageIndex = initialPageIndex;
     });
-    
-    if (initialPageIndex == -1) initialPageIndex = 0;
   }
-
-  setState(() {
-    _pages = data;
-    _isLoading = false;
-    _pageController = PageController(initialPage: initialPageIndex);
-    _currentPageIndex = initialPageIndex;
-  });
-}
 
   @override
   Widget build(BuildContext context) {
@@ -111,19 +115,33 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
+    final currentSurahNumber =
+        _pages[_currentPageIndex]['start']['surah_number'];
+    final currentSurahName = quran.getSurahNameArabic(currentSurahNumber);
+    final currentJuz = quran.getJuzNumber(
+      currentSurahNumber,
+      _pages[_currentPageIndex]['start']['verse'],
+    );
+    final currentPageNum = _pages[_currentPageIndex]['page'];
+
     return Scaffold(
       appBar: AppBar(
-        backgroundColor:Color(0xFFE0DED6),
-        title: Row(
+        backgroundColor: const Color(0xFFE0DED6),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_rounded, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              quran.getSurahNameArabic(_pages[_currentPageIndex]['start']['surah_number']),
-              style: GoogleFonts.amiriQuran(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'جزء ${quran.getJuzNumber(_pages[_currentPageIndex]['start']['surah_number'], _pages[_currentPageIndex]['start']['verse'])}',
-              style: GoogleFonts.amiriQuran(fontSize: 22, fontWeight: FontWeight.bold),
+              'سورة $currentSurahName',
+              style: GoogleFonts.amiriQuran(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF2D2D2D),
+              ),
             ),
           ],
         ),
@@ -131,13 +149,16 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
         actions: [
           IconButton(
             icon: Icon(
-              Icons.bookmark,
-              color: _bookmarkedPage == _pages[_currentPageIndex]['page']
-                  ? Colors.red
-                  : Theme.of(context).appBarTheme.actionsIconTheme?.color,
+              _bookmarkedPage == currentPageNum
+                  ? Icons.bookmark_rounded
+                  : Icons.bookmark_border_rounded,
+              color: _bookmarkedPage == currentPageNum
+                  ? const Color(0xFFE53E3E)
+                  : const Color(0xFF5A5A5A),
+              size: 26,
             ),
             onPressed: () {
-              _saveBookmark(_pages[_currentPageIndex]['page']);
+              _saveBookmark(currentPageNum);
             },
           ),
         ],
@@ -160,8 +181,11 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
         itemBuilder: (context, index) {
           final page = _pages[index];
           final imagePath = page['image']['url'];
-          final currentPageNumber = page['page'];
-          final isBookmarked = currentPageNumber == _bookmarkedPage;
+          final pageNumber = page['page'];
+          final isBookmarked = pageNumber == _bookmarkedPage;
+          final surahNum = page['start']['surah_number'];
+          final surahName = quran.getSurahNameArabic(surahNum);
+          final juzNum = quran.getJuzNumber(surahNum, page['start']['verse']);
 
           return LayoutBuilder(
             builder: (context, constraints) {
@@ -172,7 +196,7 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
                     children: [
                       Expanded(
                         child: Container(
-                          color:  Color(0xFFF0EFEA),
+                          color: const Color(0xFFF0EFEA),
                           width: availableWidth,
                           child: Image.asset(
                             'assets$imagePath',
@@ -188,17 +212,65 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
                           ),
                         ),
                       ),
+                      // Bottom info bar
                       Container(
-                        color: Color(0xFFF0EFEA),
-                        padding: const EdgeInsets.only(bottom: 40),
+                        color: const Color(0xFFE0DED6),
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 12,
+                          horizontal: 20,
+                        ),
                         child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
+                            // Surah name (right side in RTL)
                             Text(
-                              'الصفحة ${page['page']}',
-                              style: GoogleFonts.amiriQuran(
-                                fontSize: 20,
+                              'سورة $surahName',
+                              style: GoogleFonts.amiri(
+                                fontSize: 14,
                                 fontWeight: FontWeight.bold,
+                                color: const Color(0xFF4A4A4A),
+                              ),
+                            ),
+                            // Page number center badge
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [
+                                    Color(0xFF0D9488),
+                                    Color(0xFF0F766E),
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(
+                                      0xFF0D9488,
+                                    ).withOpacity(0.3),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Text(
+                                '$pageNumber',
+                                style: GoogleFonts.amiri(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                            // Juz number (left side in RTL)
+                            Text(
+                              'الجزء $juzNum',
+                              style: GoogleFonts.amiri(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF4A4A4A),
                               ),
                             ),
                           ],
@@ -211,7 +283,7 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
                       top: 0,
                       left: 20,
                       child: Icon(
-                        Icons.bookmark,
+                        Icons.bookmark_rounded,
                         color: Colors.red.withOpacity(0.8),
                         size: 50,
                       ),

@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import '../models/hive_models.dart';
 import '../services/hive_service.dart';
 import '../services/islamic_data_service.dart';
-import 'package:flutter/foundation.dart';
-
 
 class AppProvider extends ChangeNotifier {
   HiveAppSettings _settings = HiveAppSettings();
@@ -18,51 +16,67 @@ class AppProvider extends ChangeNotifier {
   List<HiveBookmark> get bookmarks => _bookmarks;
   List<HiveReadingSession> get recentSessions => _recentSessions;
   bool get isLoading => _isLoading;
-  Map<String, bool> dailyAdhkar = {
-    'morning': false,
-    'evening': false,
-    'sleep': false,
-    'travel': false,
-    'eating': false,
-  };
-  
+  // dailyAdhkar now reads directly from Hive-backed progress
+  Map<String, bool> get dailyAdhkar => _progress.dailyAdhkar;
+
   // في ملف: providers/app_provider.dart
-// ... (داخل class AppProvider)
+  // ... (داخل class AppProvider)
 
   // ... (بعد باقي الـ Getters)
-  
+
   HiveBookmark? get latestVerseBookmark {
     // 1. نبحث عن كل العلامات المرجعية التي من نوع "آية"
     final verseBookmarks = _bookmarks.where((b) => b.type == 'verse').toList();
-    
+
     // 2. إذا لم نجد أي علامات، نرجع "لا شيء" (null)
     if (verseBookmarks.isEmpty) {
       return null;
     }
-    
+
     // 3. نرجع آخر علامة مرجعية تم إضافتها في القائمة
     return verseBookmarks.last;
   }
-  
+
   // ... (باقي الكود)
-void resetProgress() {
-  dailyAdhkar.updateAll((key, value) => false);
-  notifyListeners();
-}
+  void resetProgress() {
+    _progress.dailyAdhkar.updateAll((key, value) => false);
+    _saveProgress();
+    notifyListeners();
+  }
 
   void completeCategory(String key) {
-    dailyAdhkar[key] = true;
+    _progress.dailyAdhkar[key] = true;
+    _progress.lastActivityDate = DateTime.now();
+    _saveProgress();
     notifyListeners();
   }
- 
-   void markAzkarCompleted(String categoryKey) {
-    progress.dailyAdhkar[categoryKey] = true;
+
+  void markAzkarCompleted(String categoryKey) {
+    // Re-assign the map via copy so Hive properly detects the mutation
+    _progress.dailyAdhkar = Map<String, bool>.from(_progress.dailyAdhkar)
+      ..[categoryKey] = true;
+    _progress.lastActivityDate = DateTime.now();
+    _saveProgress();
     notifyListeners();
   }
- void resetDailyProgress() {
-    progress.dailyAdhkar.updateAll((key, value) => false);
+
+  void refreshDataOnTabChange() async {
+    // Before loading bookmarks, check if we crossed midnight while the app was running/backgrounded
+    _checkAndResetDailyAdhkar();
+
+    await _loadBookmarks();
+    await _loadRecentSessions();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      notifyListeners();
+    });
+  }
+
+  void resetDailyProgress() {
+    _progress.dailyAdhkar.updateAll((key, value) => false);
+    _saveProgress();
     notifyListeners();
   }
+
   // Theme methods
   void toggleTheme() {
     _settings.isDarkMode = !_settings.isDarkMode;
@@ -71,8 +85,6 @@ void resetProgress() {
       notifyListeners();
     });
   }
-
-
 
   // Progress methods
   void updatePagesRead(int pages) {
@@ -110,27 +122,32 @@ void resetProgress() {
     });
   }
 
-void markAdhkarCompleted(String adhkarType) {
-  _progress.dailyAdhkar[adhkarType] = true;
-  _progress.lastActivityDate = DateTime.now(); // ← تحديث التاريخ
-  _saveProgress();
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    notifyListeners();
-  });
-}
-
-
-void resetDailyAdhkar() {
-  final keys = ['morning', 'evening', 'sleep', 'travel', 'eating', 'afterPrayer'];
-  for (var key in keys) {
-    _progress.dailyAdhkar[key] = false;
+  void markAdhkarCompleted(String adhkarType) {
+    _progress.dailyAdhkar[adhkarType] = true;
+    _progress.lastActivityDate = DateTime.now(); // ← تحديث التاريخ
+    _saveProgress();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      notifyListeners();
+    });
   }
-  _saveProgress();
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    notifyListeners();
-  });
-}
 
+  void resetDailyAdhkar() {
+    final keys = [
+      'morning',
+      'evening',
+      'sleep',
+      'travel',
+      'eating',
+      'afterPrayer',
+    ];
+    for (var key in keys) {
+      _progress.dailyAdhkar[key] = false;
+    }
+    _saveProgress();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      notifyListeners();
+    });
+  }
 
   // Bookmark methods
   Future<void> addBookmark(HiveBookmark bookmark) async {
@@ -162,13 +179,15 @@ void resetDailyAdhkar() {
     String? morningTime,
     String? eveningTime,
   }) {
-    if (notificationsEnabled != null) _settings.notificationsEnabled = notificationsEnabled;
+    if (notificationsEnabled != null) {
+      _settings.notificationsEnabled = notificationsEnabled;
+    }
     if (morningAdhkar != null) _settings.morningAdhkar = morningAdhkar;
     if (eveningAdhkar != null) _settings.eveningAdhkar = eveningAdhkar;
     if (prayerReminders != null) _settings.prayerReminders = prayerReminders;
     if (morningTime != null) _settings.morningTime = morningTime;
     if (eveningTime != null) _settings.eveningTime = eveningTime;
-    
+
     _saveSettings();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       notifyListeners();
@@ -176,7 +195,11 @@ void resetDailyAdhkar() {
   }
 
   // Reading session methods
-  Future<void> startReadingSession(int surahNumber, String surahName, int startVerse) async {
+  Future<void> startReadingSession(
+    int surahNumber,
+    String surahName,
+    int startVerse,
+  ) async {
     final session = HiveReadingSession(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       surahNumber: surahNumber,
@@ -185,7 +208,7 @@ void resetDailyAdhkar() {
       endVerse: startVerse,
       startTime: DateTime.now(),
     );
-    
+
     await HiveService.addReadingSession(session);
     await _loadRecentSessions();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -193,7 +216,11 @@ void resetDailyAdhkar() {
     });
   }
 
-  Future<void> endReadingSession(String sessionId, int endVerse, int pagesRead) async {
+  Future<void> endReadingSession(
+    String sessionId,
+    int endVerse,
+    int pagesRead,
+  ) async {
     final sessions = _recentSessions.where((s) => s.id == sessionId).toList();
     if (sessions.isNotEmpty) {
       final session = sessions.first;
@@ -201,14 +228,14 @@ void resetDailyAdhkar() {
       session.endVerse = endVerse;
       session.pagesRead = pagesRead;
       session.isCompleted = true;
-      
+
       // Update progress
       _progress.pagesRead += pagesRead;
       _progress.lastReadSurahNumber = session.surahNumber;
       _progress.lastReadSurah = session.surahName;
       _progress.lastReadVerse = endVerse;
       _progress.lastActivityDate = DateTime.now();
-      
+
       await _saveProgress();
       await _loadRecentSessions();
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -220,15 +247,15 @@ void resetDailyAdhkar() {
   // Search methods
   List<dynamic> searchContent(String query) {
     final results = <dynamic>[];
-    
+
     // Search Quran
     final quranResults = IslamicDataService.searchQuran(query);
     results.addAll(quranResults);
-    
+
     // Search Adhkar
     final adhkarResults = IslamicDataService.searchAdhkar(query);
     results.addAll(adhkarResults);
-    
+
     return results;
   }
 
@@ -253,22 +280,46 @@ void resetDailyAdhkar() {
   // Initialize app - simplified version
   Future<void> loadAppState() async {
     if (_isLoading) return;
-    
+
     _isLoading = true;
-    
+
     try {
       // Initialize Hive
       await HiveService.init();
-      
+
       // Load data from Hive
       _settings = HiveService.getSettings();
       _progress = HiveService.getProgress();
+
+      // Hive returns internal unmodifiable maps — copy to mutable map
+      _progress.dailyAdhkar = Map<String, bool>.from(_progress.dailyAdhkar);
+      _progress.weeklyProgress = Map<String, int>.from(
+        _progress.weeklyProgress,
+      );
+
+      // Ensure all adhkar keys exist in progress map
+      final defaultKeys = [
+        'morning',
+        'evening',
+        'sleep',
+        'travel',
+        'eating',
+        'afterPrayer',
+      ];
+      for (var key in defaultKeys) {
+        _progress.dailyAdhkar.putIfAbsent(key, () => false);
+      }
+
+      // Save the initialized keys back to Hive
+      await _saveProgress();
+
       await _loadBookmarks();
       await _loadRecentSessions();
-      
+
       // Check if we need to reset daily adhkar (new day)
       _checkAndResetDailyAdhkar();
       
+      notifyListeners(); // مهم جداً
     } catch (e) {
       print('Error loading app state: $e');
     } finally {
@@ -276,39 +327,43 @@ void resetDailyAdhkar() {
     }
   }
 
-void _checkAndResetDailyAdhkar() {
-  final now = DateTime.now();
-  final lastActivity = _progress.lastActivityDate;
+  void _checkAndResetDailyAdhkar() {
+    final now = DateTime.now();
+    final lastActivity = _progress.lastActivityDate;
 
-  // أول مرة يفتح التطبيق
-  // ignore: unnecessary_null_comparison
-  if (lastActivity == null) {
-    _progress.lastActivityDate = now;
-    _saveProgress();
-    return;
+    // أول مرة يفتح التطبيق
+    // ignore: unnecessary_null_comparison
+    if (lastActivity == null) {
+      _progress.lastActivityDate = now;
+      _saveProgress();
+      return;
+    }
+
+    // تحقق من اختلاف اليوم
+    final isNewDay =
+        now.year != lastActivity.year ||
+        now.month != lastActivity.month ||
+        now.day != lastActivity.day;
+
+    if (isNewDay) {
+      // Create a fresh map to guarantee update correctly triggers
+      _progress.dailyAdhkar.updateAll((key, value) => false);
+      _progress.lastActivityDate = now;
+      _saveProgress();
+    }
   }
-
-  // تحقق من اختلاف اليوم
-  final isNewDay = now.year != lastActivity.year ||
-      now.month != lastActivity.month ||
-      now.day != lastActivity.day;
-
-  if (isNewDay) {
-    resetDailyAdhkar();
-    _progress.lastActivityDate = now;
-    _saveProgress();
-  }
-}
-
 
   // Utility methods
   int getTotalBookmarks() => _bookmarks.length;
   int getVerseBookmarks() => _bookmarks.where((b) => b.type == 'verse').length;
-  int getAdhkarBookmarks() => _bookmarks.where((b) => b.type == 'adhkar').length;
-  
+  int getAdhkarBookmarks() =>
+      _bookmarks.where((b) => b.type == 'adhkar').length;
+
   double getDailyProgress() {
     final totalAdhkar = 6; // morning, evening, prayer, sleep, travel, eating
-    final completed = _progress.dailyAdhkar.values.where((completed) => completed).length;
+    final completed = _progress.dailyAdhkar.values
+        .where((completed) => completed)
+        .length;
     return completed / totalAdhkar;
   }
 

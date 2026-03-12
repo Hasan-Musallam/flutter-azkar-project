@@ -1,4 +1,3 @@
-
 // App Theme State
 class AppThemeState {
   final bool isDarkMode;

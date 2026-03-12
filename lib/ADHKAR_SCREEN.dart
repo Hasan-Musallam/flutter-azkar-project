@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_application_1/pages/AzkarDetailsScreen.dart';
+import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:provider/provider.dart';
 import 'providers/app_provider.dart';
 
@@ -11,97 +12,205 @@ class AdhkarScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final appProvider = Provider.of<AppProvider>(context);
     final progress = appProvider.dailyAdhkar;
+    final completedCount = progress.values.where((v) => v == true).length;
 
     return Scaffold(
-      appBar: AppBar(centerTitle: true, title: const Text('الأذكار اليومية')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // بعد قسم "تقدمك اليومي"
-            const SizedBox(height: 32),
-
-            Text(
-              "الأقسام",
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Title
+              Text(
+                'الأذكار اليومية',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Amiri',
+                  color: theme.colorScheme.onSurface,
+                ),
               ),
-            ),
+              const SizedBox(height: 20),
 
-            const SizedBox(height: 16),
-
-            // شبكة البطاقات 2x2
-            GridView.count(
-              crossAxisCount: 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              mainAxisSpacing: 16,
-              crossAxisSpacing: 16,
-              childAspectRatio: 0.9,
-              children: [
-                _AdhkarCard(
-                  icon: Icons.wb_sunny,
-                  title: 'أذكار الصباح',
-                  color: const Color(0xFFFEF3C7),
-                  iconColor: const Color(0xFFF59E0B),
-                  isCompleted: progress['morning'] ?? false,
-                  onTap: () =>
-                      _openAzkarCategory(context, 'أذكار الصباح', 'morning'),
-                ),
-                _AdhkarCard(
-                  icon: Icons.nightlight_round,
-                  title: 'أذكار المساء',
-                  color: const Color(0xFFDBEAFE),
-                  iconColor: const Color(0xFF3B82F6),
-                  isCompleted: progress['evening'] ?? false,
-                  onTap: () =>
-                      _openAzkarCategory(context, 'أذكار المساء', 'evening'),
-                ),
-                _AdhkarCard(
-                  icon: Icons.bed,
-                  title: 'أذكار النوم',
-                  color: const Color(0xFFEDE9FE),
-                  iconColor: const Color(0xFF8B5CF6),
-                  isCompleted: progress['sleep'] ?? false,
-                  onTap: () =>
-                      _openAzkarCategory(context, 'أذكار النوم', 'sleep'),
-                ),
-                _AdhkarCard(
-                  icon: Icons.directions_car,
-                  title: 'أذكار السفر',
-                  color: const Color(0xFFDBEAFE),
-                  iconColor: const Color(0xFF0EA5E9),
-                  isCompleted: progress['travel'] ?? false,
-                  onTap: () =>
-                      _openAzkarCategory(context, 'أذكار السفر', 'travel'),
-                ),
-                _AdhkarCard(
-                  icon: Icons.restaurant,
-                  title: 'أذكار الطعام',
-                  color: const Color(0xFFFED7AA),
-                  iconColor: const Color(0xFFF97316),
-                  isCompleted: progress['eating'] ?? false,
-                  onTap: () =>
-                      _openAzkarCategory(context, 'أذكار الطعام', 'eating'),
-                ),
-                _AdhkarCard(
-                  icon: Icons.mosque,
-                  title: 'أذكار ما بعد الصلاة',
-                  color: const Color(0xFFD1FAE5),
-                  iconColor: const Color(0xFF059669),
-                  isCompleted: progress['afterPrayer'] ?? false,
-                  onTap: () => _openAzkarCategory(
-                    context,
-                    'أذكار بعد السلام من الصلاة',
-                    'afterPrayer',
+              // Progress circle card
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: isDark
+                        ? [const Color(0xFF1E293B), const Color(0xFF334155)]
+                        : [
+                            const Color(0xFF0D9488).withOpacity(0.08),
+                            const Color(0xFF6366F1).withOpacity(0.05),
+                          ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: isDark
+                        ? Colors.white.withOpacity(0.08)
+                        : const Color(0xFF0D9488).withOpacity(0.15),
                   ),
                 ),
-              ],
-            ),
-          ],
+                child: Row(
+                  children: [
+                    // Circular progress
+                    SizedBox(
+                      width: 80,
+                      height: 80,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          SizedBox(
+                            width: 80,
+                            height: 80,
+                            child: CircularProgressIndicator(
+                              value: completedCount / 6,
+                              strokeWidth: 8,
+                              strokeCap: StrokeCap.round,
+                              backgroundColor: isDark
+                                  ? Colors.white.withOpacity(0.1)
+                                  : const Color(0xFF0D9488).withOpacity(0.15),
+                              valueColor: const AlwaysStoppedAnimation<Color>(
+                                Color(0xFF0D9488),
+                              ),
+                            ),
+                          ),
+                          Text(
+                            '$completedCount/6',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 20),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'تقدمك اليومي',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 28),
+
+              Text(
+                'الأقسام',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Amiri',
+                  color: theme.colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Grid
+              AnimationLimiter(
+                child: GridView.count(
+                  crossAxisCount: 2,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  mainAxisSpacing: 14,
+                  crossAxisSpacing: 14,
+                  childAspectRatio: 0.95,
+                  children: AnimationConfiguration.toStaggeredList(
+                    duration: const Duration(milliseconds: 400),
+                    childAnimationBuilder: (widget) => SlideAnimation(
+                      verticalOffset: 30.0,
+                      child: FadeInAnimation(child: widget),
+                    ),
+                    children: [
+                      _AdhkarCard(
+                        icon: Icons.wb_sunny_rounded,
+                        title: 'أذكار الصباح',
+                        gradient: const [Color(0xFFF59E0B), Color(0xFFD97706)],
+                        isCompleted: progress['morning'] ?? false,
+                        onTap: () => _openAzkarCategory(
+                          context,
+                          'أذكار الصباح',
+                          'morning',
+                        ),
+                      ),
+                      _AdhkarCard(
+                        icon: Icons.nightlight_round,
+                        title: 'أذكار المساء',
+                        gradient: const [Color(0xFF3B82F6), Color(0xFF2563EB)],
+                        isCompleted: progress['evening'] ?? false,
+                        onTap: () => _openAzkarCategory(
+                          context,
+                          'أذكار المساء',
+                          'evening',
+                        ),
+                      ),
+                      _AdhkarCard(
+                        icon: Icons.bedtime_rounded,
+                        title: 'أذكار النوم',
+                        gradient: const [Color(0xFF8B5CF6), Color(0xFF7C3AED)],
+                        isCompleted: progress['sleep'] ?? false,
+                        onTap: () =>
+                            _openAzkarCategory(context, 'أذكار النوم', 'sleep'),
+                      ),
+                      _AdhkarCard(
+                        icon: Icons.flight_takeoff_rounded,
+                        title: 'أذكار السفر',
+                        gradient: const [Color(0xFF06B6D4), Color(0xFF0891B2)],
+                        isCompleted: progress['travel'] ?? false,
+                        onTap: () => _openAzkarCategory(
+                          context,
+                          'أذكار السفر',
+                          'travel',
+                        ),
+                      ),
+                      _AdhkarCard(
+                        icon: Icons.restaurant_rounded,
+                        title: 'أذكار الطعام',
+                        gradient: const [Color(0xFFF97316), Color(0xFFEA580C)],
+                        isCompleted: progress['eating'] ?? false,
+                        onTap: () => _openAzkarCategory(
+                          context,
+                          'أذكار الطعام',
+                          'eating',
+                        ),
+                      ),
+                      _AdhkarCard(
+                        icon: Icons.mosque_rounded,
+                        title: 'أذكار بعد الصلاة',
+                        gradient: const [Color(0xFF10B981), Color(0xFF059669)],
+                        isCompleted: progress['afterPrayer'] ?? false,
+                        onTap: () => _openAzkarCategory(
+                          context,
+                          'أذكار بعد السلام من الصلاة',
+                          'afterPrayer',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -174,79 +283,103 @@ Future<void> _openAzkarCategory(
   }
 }
 
-/// ------------------ بطاقة الذكر (تصميم جديد) ------------------
+/// ------------------ بطاقة الذكر ------------------
 class _AdhkarCard extends StatelessWidget {
   final IconData icon;
   final String title;
-  final Color color;
-  final Color iconColor;
+  final List<Color> gradient;
   final bool isCompleted;
   final VoidCallback? onTap;
 
   const _AdhkarCard({
     required this.icon,
     required this.title,
-    required this.color,
-    required this.iconColor,
+    required this.gradient,
     required this.isCompleted,
     this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      splashColor: iconColor.withOpacity(0.1),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(24),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: gradient,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-          ],
-          border: Border.all(color: iconColor.withOpacity(0.3), width: 1.2),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: iconColor.withOpacity(0.15),
-                shape: BoxShape.circle,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: gradient[0].withOpacity(0.35),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
               ),
-              child: Icon(
-                icon,
-                color: iconColor,
-                size: 40, // أيقونة أكبر
+            ],
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: Colors.white, size: 36),
               ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: theme.colorScheme.onSurface,
+              const SizedBox(height: 14),
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Icon(
-              isCompleted ? Icons.check_circle_rounded : Icons.arrow_back_ios,
-              color: isCompleted
-                  ? const Color(0xFF10B981)
-                  : theme.colorScheme.onSurface.withOpacity(0.4),
-              size: isCompleted ? 26 : 20,
-            ),
-          ],
+              const SizedBox(height: 8),
+              if (isCompleted)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.25),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.check_circle_rounded,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        'تم',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
