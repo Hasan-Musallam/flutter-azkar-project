@@ -178,6 +178,7 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
           );
         },
         itemCount: _pages.length,
+
         itemBuilder: (context, index) {
           final page = _pages[index];
           final imagePath = page['image']['url'];
@@ -186,6 +187,7 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
           final surahNum = page['start']['surah_number'];
           final surahName = quran.getSurahNameArabic(surahNum);
           final juzNum = quran.getJuzNumber(surahNum, page['start']['verse']);
+          final hizbNum = getHizbNumber(surahNum, page['start']['verse']);
 
           return LayoutBuilder(
             builder: (context, constraints) {
@@ -222,9 +224,9 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            // Surah name (right side in RTL)
+                            // Hizb Number (right side in RTL)
                             Text(
-                              'سورة $surahName',
+                              'حزب $hizbNum',
                               style: GoogleFonts.amiri(
                                 fontSize: 14,
                                 fontWeight: FontWeight.bold,
@@ -301,5 +303,24 @@ class _SurahDetailScreenState extends State<SurahDetailScreen> {
   void dispose() {
     _pageController.dispose();
     super.dispose();
+  }
+
+  int getHizbNumber(int surah, int ayah) {
+    int juz = quran.getJuzNumber(surah, ayah);
+
+    // نحصل على رقم الصفحة
+    int page = quran.getPageNumber(surah, ayah);
+
+    // كل جزء فيه تقريبًا 20 صفحة (تقريب)
+    int firstPageOfJuz = (juz - 1) * 20 + 1;
+
+    int offset = page - firstPageOfJuz;
+
+    // إذا في أول نصف الجزء => حزب 1
+    if (offset < 10) {
+      return (juz - 1) * 2 + 1;
+    } else {
+      return (juz - 1) * 2 + 2;
+    }
   }
 }

@@ -12,9 +12,15 @@ import 'screens/splash_screen.dart';
 import 'PrayerTime.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'services/notification_service.dart';
+import 'package:alarm/alarm.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // تهيئة الإشعارات العادية والمنبه
+  await NotificationService.initialize();
+  await Alarm.init();
 
   final appProvider = AppProvider();
   await appProvider.loadAppState();
@@ -177,6 +183,7 @@ class _MainScreenState extends State<MainScreen> {
     try {
       final appProvider = Provider.of<AppProvider>(context, listen: false);
       await appProvider.loadAppState();
+      await NotificationService.requestPermissions();
 
       if (mounted) {
         setState(() {

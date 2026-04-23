@@ -7,6 +7,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:quran/quran.dart' as quran;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
+import 'package:just_audio/just_audio.dart';
 import 'providers/app_provider.dart';
 
 class QuranScreen extends StatefulWidget {
@@ -25,12 +26,40 @@ class _QuranScreenState extends State<QuranScreen>
   int _bookmarkedSurah = 1;
   int _bookmarkedPage = 1;
 
+  bool _isAudioMode = false;
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  int? _currentPlayingSurah;
+  bool _isPlaying = false;
+  quran.Reciter _selectedReciter = quran.Reciter.arAlafasy;
+
+  static const Map<quran.Reciter, String> _reciters = {
+    quran.Reciter.arAlafasy: 'مشاري العفاسي',
+    quran.Reciter.arHusary: 'محمود خليل الحصري',
+    quran.Reciter.arAhmedAjamy: 'أحمد العجمي',
+    quran.Reciter.arHudhaify: 'علي الحذيفي',
+    quran.Reciter.arMaherMuaiqly: 'ماهر المعيقلي',
+    quran.Reciter.arMuhammadAyyoub: 'محمد أيوب',
+    quran.Reciter.arMuhammadJibreel: 'محمد جبريل',
+    quran.Reciter.arMinshawi: 'محمد صديق المنشاوي',
+    quran.Reciter.arShaatree: 'أبو بكر الشاطري',
+  };
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _loadAllSurahs();
     _loadBookmarkData();
+
+    _audioPlayer.playerStateStream.listen((state) {
+      if (mounted) {
+        setState(() {
+          _isPlaying =
+              state.playing &&
+              state.processingState != ProcessingState.completed;
+        });
+      }
+    });
   }
 
   Future<void> _loadBookmarkData() async {
@@ -92,6 +121,7 @@ class _QuranScreenState extends State<QuranScreen>
   void dispose() {
     _tabController.dispose();
     _searchController.dispose();
+    _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -304,10 +334,423 @@ class _QuranScreenState extends State<QuranScreen>
 
             const SizedBox(height: 12),
 
+            // Toggle for Reading / Audio
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? Colors.white.withOpacity(0.05)
+                      : Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                padding: const EdgeInsets.all(4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() => _isAudioMode = false);
+                          if (_isPlaying) {
+                            _audioPlayer.pause();
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: !_isAudioMode
+                                ? const Color(0xFF0D9488)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: !_isAudioMode
+                                ? [
+                                    BoxShadow(
+                                      color: const Color(
+                                        0xFF0D9488,
+                                      ).withOpacity(0.3),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ]
+                                : [],
+                          ),
+                          child: Center(
+                            child: Text(
+                              'قراءة',
+                              style: TextStyle(
+                                color: !_isAudioMode
+                                    ? Colors.white
+                                    : theme.colorScheme.onSurface,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                fontFamily: 'Amiri',
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _isAudioMode = true),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: _isAudioMode
+                                ? const Color(0xFF0D9488)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: _isAudioMode
+                                ? [
+                                    BoxShadow(
+                                      color: const Color(
+                                        0xFF0D9488,
+                                      ).withOpacity(0.3),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ]
+                                : [],
+                          ),
+                          child: Center(
+                            child: Text(
+                              'استماع',
+                              style: TextStyle(
+                                color: _isAudioMode
+                                    ? Colors.white
+                                    : theme.colorScheme.onSurface,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                fontFamily: 'Amiri',
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+
             // Surahs List
-            Expanded(child: _SurahsList(surahs: _filteredSurahs)),
+            Expanded(
+              child: _SurahsList(
+                surahs: _filteredSurahs,
+                isAudioMode: _isAudioMode,
+                currentPlayingSurah: _currentPlayingSurah,
+                isPlaying: _isPlaying,
+                onSurahTap: (surahNumber) {
+                  if (_isAudioMode) {
+                    _playSurahAudio(surahNumber);
+                  } else {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            SurahDetailScreen(surahNumber: surahNumber),
+                      ),
+                    ).then((_) => _loadBookmarkData());
+                  }
+                },
+              ),
+            ),
+            if (_isAudioMode) _buildAudioPlayer(),
           ],
         ),
+      ),
+    );
+  }
+
+  Future<void> _playSurahAudio(int surahNumber) async {
+    try {
+      if (_currentPlayingSurah == surahNumber && _isPlaying) {
+        await _audioPlayer.pause();
+      } else if (_currentPlayingSurah == surahNumber && !_isPlaying) {
+        await _audioPlayer.play();
+      } else {
+        await _audioPlayer.stop();
+        final audioUrl = quran.getAudioURLBySurah(
+          surahNumber,
+          reciter: _selectedReciter,
+        );
+        await _audioPlayer.setAudioSource(AudioSource.uri(Uri.parse(audioUrl)));
+        setState(() {
+          _currentPlayingSurah = surahNumber;
+        });
+        await _audioPlayer.play();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'حدث خطأ أثناء تشغيل الصوت، تأكد من اتصالك بالإنترنت',
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _changeReciter(quran.Reciter newReciter) async {
+    final surahToReplay = _currentPlayingSurah;
+    setState(() {
+      _selectedReciter = newReciter;
+    });
+
+    if (surahToReplay != null) {
+      try {
+        await _audioPlayer.stop();
+        // انتظر لحظة حتى يتم إغلاق الـ Bottom Sheet
+        await Future.delayed(const Duration(milliseconds: 300));
+        final audioUrl = quran.getAudioURLBySurah(
+          surahToReplay,
+          reciter: _selectedReciter,
+        );
+        await _audioPlayer.setAudioSource(AudioSource.uri(Uri.parse(audioUrl)));
+        setState(() {
+          _currentPlayingSurah = surahToReplay;
+        });
+        await _audioPlayer.play();
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'حدث خطأ أثناء تشغيل الصوت، تأكد من اتصالك بالإنترنت',
+              ),
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  void _showReciterPicker() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'اختر القارئ',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Amiri',
+                ),
+              ),
+              const SizedBox(height: 8),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _reciters.length,
+                  itemBuilder: (context, index) {
+                    final entry = _reciters.entries.elementAt(index);
+                    final isSelected = entry.key == _selectedReciter;
+                    return ListTile(
+                      leading: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? const Color(0xFF0D9488).withOpacity(0.15)
+                              : Colors.grey.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          isSelected
+                              ? Icons.check_circle_rounded
+                              : Icons.person_rounded,
+                          color: isSelected
+                              ? const Color(0xFF0D9488)
+                              : Colors.grey,
+                        ),
+                      ),
+                      title: Text(
+                        entry.value,
+                        style: TextStyle(
+                          fontFamily: 'Amiri',
+                          fontSize: 16,
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                          color: isSelected ? const Color(0xFF0D9488) : null,
+                        ),
+                      ),
+                      onTap: () {
+                        final newReciter = entry.key;
+                        Navigator.pop(context);
+                        _changeReciter(newReciter);
+                      },
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAudioPlayer() {
+    if (_currentPlayingSurah == null) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0D9488).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.music_note_rounded,
+                  color: Color(0xFF0D9488),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'سورة ${quran.getSurahNameArabic(_currentPlayingSurah!)}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        fontFamily: 'Amiri',
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () => _showReciterPicker(),
+                      child: Row(
+                        children: [
+                          Text(
+                            _reciters[_selectedReciter] ?? '',
+                            style: TextStyle(
+                              color: theme.colorScheme.onSurface.withOpacity(
+                                0.6,
+                              ),
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            size: 16,
+                            color: theme.colorScheme.onSurface.withOpacity(0.4),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.replay_10_rounded),
+                onPressed: () {
+                  final newPosition =
+                      _audioPlayer.position - const Duration(seconds: 10);
+                  _audioPlayer.seek(
+                    newPosition < Duration.zero ? Duration.zero : newPosition,
+                  );
+                },
+              ),
+              IconButton(
+                icon: Icon(
+                  _isPlaying
+                      ? Icons.pause_circle_filled_rounded
+                      : Icons.play_circle_fill_rounded,
+                  size: 40,
+                  color: const Color(0xFF0D9488),
+                ),
+                onPressed: () => _playSurahAudio(_currentPlayingSurah!),
+              ),
+              IconButton(
+                icon: const Icon(Icons.forward_10_rounded),
+                onPressed: () {
+                  final newPosition =
+                      _audioPlayer.position + const Duration(seconds: 10);
+                  _audioPlayer.seek(newPosition);
+                },
+              ),
+            ],
+          ),
+          StreamBuilder<Duration>(
+            stream: _audioPlayer.positionStream,
+            builder: (context, snapshot) {
+              final position = snapshot.data ?? Duration.zero;
+              final duration = _audioPlayer.duration ?? Duration.zero;
+              if (duration == Duration.zero) return const SizedBox.shrink();
+              return SliderTheme(
+                data: SliderThemeData(
+                  trackHeight: 2,
+                  thumbShape: const RoundSliderThumbShape(
+                    enabledThumbRadius: 6,
+                  ),
+                  overlayShape: const RoundSliderOverlayShape(
+                    overlayRadius: 14,
+                  ),
+                ),
+                child: Slider(
+                  value: position.inMilliseconds.toDouble().clamp(
+                    0.0,
+                    duration.inMilliseconds.toDouble(),
+                  ),
+                  max: duration.inMilliseconds.toDouble(),
+                  activeColor: const Color(0xFF0D9488),
+                  inactiveColor: const Color(0xFF0D9488).withOpacity(0.2),
+                  onChanged: (value) {
+                    _audioPlayer.seek(Duration(milliseconds: value.toInt()));
+                  },
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }
@@ -331,8 +774,18 @@ class _QuranScreenState extends State<QuranScreen>
 
 class _SurahsList extends StatelessWidget {
   final List<Map<String, dynamic>> surahs;
+  final bool isAudioMode;
+  final int? currentPlayingSurah;
+  final bool isPlaying;
+  final Function(int) onSurahTap;
 
-  const _SurahsList({required this.surahs});
+  const _SurahsList({
+    required this.surahs,
+    this.isAudioMode = false,
+    this.currentPlayingSurah,
+    this.isPlaying = false,
+    required this.onSurahTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -424,26 +877,26 @@ class _SurahsList extends StatelessWidget {
                 color: theme.colorScheme.onSurface.withOpacity(0.5),
               ),
             ),
-            trailing: surah['type'] == 'Madinah'
-                ? SvgPicture.asset(
-                    'assets/data/svgIcons/masjid-al-nabawi.svg',
-                    width: 22,
-                    height: 22,
+            trailing: isAudioMode
+                ? Icon(
+                    currentPlayingSurah == surah['number'] && isPlaying
+                        ? Icons.pause_circle_filled_rounded
+                        : Icons.play_circle_fill_rounded,
+                    color: const Color(0xFF0D9488),
+                    size: 32,
                   )
-                : SvgPicture.asset(
-                    'assets/data/svgIcons/mecca.svg',
-                    width: 22,
-                    height: 22,
-                  ),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) =>
-                      SurahDetailScreen(surahNumber: surah['number']),
-                ),
-              ).then((_) => (context as Element).reassemble());
-            },
+                : (surah['type'] == 'Madinah'
+                      ? SvgPicture.asset(
+                          'assets/data/svgIcons/masjid-al-nabawi.svg',
+                          width: 22,
+                          height: 22,
+                        )
+                      : SvgPicture.asset(
+                          'assets/data/svgIcons/mecca.svg',
+                          width: 22,
+                          height: 22,
+                        )),
+            onTap: () => onSurahTap(surah['number']),
           ),
         );
       },

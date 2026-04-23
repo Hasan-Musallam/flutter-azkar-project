@@ -8,6 +8,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:hijri/hijri_calendar.dart';
 import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'services/notification_service.dart';
 
 class PrayerTimesPage extends StatefulWidget {
   const PrayerTimesPage({super.key});
@@ -145,6 +146,8 @@ class _PrayerTimesPageState extends State<PrayerTimesPage>
         _errorMessage = null;
         _calculateCurrentPrayer();
       });
+
+      _scheduleNotificationsForNextDays(coordinates, params);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -218,6 +221,57 @@ class _PrayerTimesPageState extends State<PrayerTimesPage>
     ];
     final monthName = arabicMonths[hijri.hMonth - 1];
     return '${hijri.hDay} $monthName ${hijri.hYear} هـ';
+  }
+
+  void _scheduleNotificationsForNextDays(
+    Coordinates coordinates,
+    CalculationParameters params,
+  ) async {
+    await NotificationService.cancelAllNotifications();
+
+    final now = DateTime.now();
+    int notificationId = 1;
+
+    for (int i = 0; i < 7; i++) {
+      final date = now.add(Duration(days: i));
+      final dateComponents = DateComponents(date.year, date.month, date.day);
+      final times = PrayerTimes(coordinates, dateComponents, params);
+
+      await NotificationService.schedulePrayerNotification(
+        notificationId++,
+        'حان الآن موعد أذان الفجر',
+        'الصلاة خير من النوم',
+        times.fajr,
+      );
+
+      await NotificationService.schedulePrayerNotification(
+        notificationId++,
+        'حان الآن موعد أذان الظهر',
+        'حي على الصلاة',
+        times.dhuhr,
+      );
+
+      await NotificationService.schedulePrayerNotification(
+        notificationId++,
+        'حان الآن موعد أذان العصر',
+        'حي على الصلاة',
+        times.asr,
+      );
+
+      await NotificationService.schedulePrayerNotification(
+        notificationId++,
+        'حان الآن موعد أذان المغرب',
+        'حي على الصلاة',
+        times.maghrib,
+      );
+
+      await NotificationService.schedulePrayerNotification(
+        notificationId++,
+        'حان الآن موعد أذان العشاء',
+        'حي على الصلاة',
+        times.isha,
+      );
+    }
   }
 
   @override
