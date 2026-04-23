@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import 'package:just_audio/just_audio.dart';
 import 'providers/app_provider.dart';
+import 'services/audio_handler.dart';
 
 class QuranScreen extends StatefulWidget {
   const QuranScreen({super.key});
@@ -27,7 +28,6 @@ class _QuranScreenState extends State<QuranScreen>
   int _bookmarkedPage = 1;
 
   bool _isAudioMode = false;
-  final AudioPlayer _audioPlayer = AudioPlayer();
   int? _currentPlayingSurah;
   bool _isPlaying = false;
   quran.Reciter _selectedReciter = quran.Reciter.arAlafasy;
@@ -51,12 +51,20 @@ class _QuranScreenState extends State<QuranScreen>
     _loadAllSurahs();
     _loadBookmarkData();
 
-    _audioPlayer.playerStateStream.listen((state) {
+    // Register surah navigation callbacks for notification controls
+    audioHandler.onSkipToNextSurah = _playNextSurah;
+    audioHandler.onSkipToPreviousSurah = _playPreviousSurah;
+
+    audioHandler.player.playerStateStream.listen((state) {
       if (mounted) {
         setState(() {
           _isPlaying =
               state.playing &&
               state.processingState != ProcessingState.completed;
+          // Sync the current surah from the handler
+          if (state.processingState == ProcessingState.completed) {
+            _currentPlayingSurah = null;
+          }
         });
       }
     });
@@ -121,8 +129,28 @@ class _QuranScreenState extends State<QuranScreen>
   void dispose() {
     _tabController.dispose();
     _searchController.dispose();
-    _audioPlayer.dispose();
+    // Clean up callbacks but don't dispose the global audio handler
+    audioHandler.onSkipToNextSurah = null;
+    audioHandler.onSkipToPreviousSurah = null;
     super.dispose();
+  }
+
+  /// Play the next surah (called from notification skip-next)
+  void _playNextSurah() {
+    if (_currentPlayingSurah == null) return;
+    final nextSurah = _currentPlayingSurah! + 1;
+    if (nextSurah <= 114) {
+      _playSurahAudio(nextSurah);
+    }
+  }
+
+  /// Play the previous surah (called from notification skip-previous)
+  void _playPreviousSurah() {
+    if (_currentPlayingSurah == null) return;
+    final prevSurah = _currentPlayingSurah! - 1;
+    if (prevSurah >= 1) {
+      _playSurahAudio(prevSurah);
+    }
   }
 
   @override
@@ -352,7 +380,7 @@ class _QuranScreenState extends State<QuranScreen>
                         onTap: () {
                           setState(() => _isAudioMode = false);
                           if (_isPlaying) {
-                            _audioPlayer.pause();
+                            audioHandler.pause();
                           }
                         },
                         child: Container(
@@ -463,23 +491,44 @@ class _QuranScreenState extends State<QuranScreen>
     );
   }
 
+  /// ينشئ قائمة تشغيل من آيات السورة (لأن رابط السورة الكامل لا يعمل لجميع القراء)
+  ConcatenatingAudioSource _buildSurahPlaylist(int surahNumber) {
+    final verseCount = quran.getVerseCount(surahNumber);
+    final sources = <AudioSource>[];
+    for (int i = 1; i <= verseCount; i++) {
+      final url = quran.getAudioURLByVerse(
+        surahNumber,
+        i,
+        reciter: _selectedReciter,
+      );
+      sources.add(AudioSource.uri(Uri.parse(url)));
+    }
+    return ConcatenatingAudioSource(children: sources);
+  }
+
   Future<void> _playSurahAudio(int surahNumber) async {
     try {
       if (_currentPlayingSurah == surahNumber && _isPlaying) {
-        await _audioPlayer.pause();
+        await audioHandler.pause();
       } else if (_currentPlayingSurah == surahNumber && !_isPlaying) {
-        await _audioPlayer.play();
+        await audioHandler.play();
       } else {
-        await _audioPlayer.stop();
-        final audioUrl = quran.getAudioURLBySurah(
-          surahNumber,
-          reciter: _selectedReciter,
+        await audioHandler.player.stop();
+        final playlist = _buildSurahPlaylist(surahNumber);
+        final surahName = quran.getSurahNameArabic(surahNumber);
+        final reciterName = _reciters[_selectedReciter] ?? '';
+        final totalVerses = quran.getVerseCount(surahNumber);
+        await audioHandler.setSurahSource(
+          source: playlist,
+          surahNumber: surahNumber,
+          surahName: surahName,
+          reciterName: reciterName,
+          totalVerses: totalVerses,
         );
-        await _audioPlayer.setAudioSource(AudioSource.uri(Uri.parse(audioUrl)));
         setState(() {
           _currentPlayingSurah = surahNumber;
         });
-        await _audioPlayer.play();
+        await audioHandler.play();
       }
     } catch (e) {
       if (mounted) {
@@ -502,18 +551,23 @@ class _QuranScreenState extends State<QuranScreen>
 
     if (surahToReplay != null) {
       try {
-        await _audioPlayer.stop();
-        // انتظر لحظة حتى يتم إغلاق الـ Bottom Sheet
+        await audioHandler.player.stop();
         await Future.delayed(const Duration(milliseconds: 300));
-        final audioUrl = quran.getAudioURLBySurah(
-          surahToReplay,
-          reciter: _selectedReciter,
+        final playlist = _buildSurahPlaylist(surahToReplay);
+        final surahName = quran.getSurahNameArabic(surahToReplay);
+        final reciterName = _reciters[newReciter] ?? '';
+        final totalVerses = quran.getVerseCount(surahToReplay);
+        await audioHandler.setSurahSource(
+          source: playlist,
+          surahNumber: surahToReplay,
+          surahName: surahName,
+          reciterName: reciterName,
+          totalVerses: totalVerses,
         );
-        await _audioPlayer.setAudioSource(AudioSource.uri(Uri.parse(audioUrl)));
         setState(() {
           _currentPlayingSurah = surahToReplay;
         });
-        await _audioPlayer.play();
+        await audioHandler.play();
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -690,13 +744,11 @@ class _QuranScreenState extends State<QuranScreen>
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.replay_10_rounded),
+                icon: const Icon(Icons.skip_next_rounded),
                 onPressed: () {
-                  final newPosition =
-                      _audioPlayer.position - const Duration(seconds: 10);
-                  _audioPlayer.seek(
-                    newPosition < Duration.zero ? Duration.zero : newPosition,
-                  );
+                  if (audioHandler.player.hasPrevious) {
+                    audioHandler.skipToPrevious();
+                  }
                 },
               ),
               IconButton(
@@ -710,43 +762,94 @@ class _QuranScreenState extends State<QuranScreen>
                 onPressed: () => _playSurahAudio(_currentPlayingSurah!),
               ),
               IconButton(
-                icon: const Icon(Icons.forward_10_rounded),
+                icon: const Icon(Icons.skip_previous_rounded),
                 onPressed: () {
-                  final newPosition =
-                      _audioPlayer.position + const Duration(seconds: 10);
-                  _audioPlayer.seek(newPosition);
+                  if (audioHandler.player.hasNext) {
+                    audioHandler.skipToNext();
+                  }
                 },
               ),
             ],
           ),
-          StreamBuilder<Duration>(
-            stream: _audioPlayer.positionStream,
-            builder: (context, snapshot) {
-              final position = snapshot.data ?? Duration.zero;
-              final duration = _audioPlayer.duration ?? Duration.zero;
-              if (duration == Duration.zero) return const SizedBox.shrink();
-              return SliderTheme(
-                data: SliderThemeData(
-                  trackHeight: 2,
-                  thumbShape: const RoundSliderThumbShape(
-                    enabledThumbRadius: 6,
-                  ),
-                  overlayShape: const RoundSliderOverlayShape(
-                    overlayRadius: 14,
-                  ),
-                ),
-                child: Slider(
-                  value: position.inMilliseconds.toDouble().clamp(
-                    0.0,
-                    duration.inMilliseconds.toDouble(),
-                  ),
-                  max: duration.inMilliseconds.toDouble(),
-                  activeColor: const Color(0xFF0D9488),
-                  inactiveColor: const Color(0xFF0D9488).withOpacity(0.2),
-                  onChanged: (value) {
-                    _audioPlayer.seek(Duration(milliseconds: value.toInt()));
-                  },
-                ),
+          StreamBuilder<int?>(
+            stream: audioHandler.player.currentIndexStream,
+            builder: (context, indexSnapshot) {
+              final currentIndex = indexSnapshot.data ?? 0;
+              final totalVerses = _currentPlayingSurah != null
+                  ? quran.getVerseCount(_currentPlayingSurah!)
+                  : 1;
+
+              return StreamBuilder<Duration>(
+                stream: audioHandler.player.positionStream,
+                builder: (context, posSnapshot) {
+                  final position = posSnapshot.data ?? Duration.zero;
+                  final verseDuration = audioHandler.player.duration ?? Duration.zero;
+
+                  // حساب التقدم الكلي: الآيات المكتملة + نسبة الآية الحالية
+                  double progress = currentIndex.toDouble();
+                  if (verseDuration.inMilliseconds > 0) {
+                    progress +=
+                        position.inMilliseconds / verseDuration.inMilliseconds;
+                  }
+
+                  return Column(
+                    children: [
+                      SliderTheme(
+                        data: SliderThemeData(
+                          trackHeight: 2,
+                          thumbShape: const RoundSliderThumbShape(
+                            enabledThumbRadius: 6,
+                          ),
+                          overlayShape: const RoundSliderOverlayShape(
+                            overlayRadius: 14,
+                          ),
+                        ),
+                        child: Slider(
+                          value: progress.clamp(0.0, totalVerses.toDouble()),
+                          max: totalVerses.toDouble(),
+                          activeColor: const Color(0xFF0D9488),
+                          inactiveColor: const Color(
+                            0xFF0D9488,
+                          ).withOpacity(0.2),
+                          onChanged: (value) {
+                            final verseIndex = value.floor().clamp(
+                              0,
+                              totalVerses - 1,
+                            );
+                            final fraction = value - verseIndex;
+                            audioHandler.player.seek(Duration.zero, index: verseIndex);
+                          },
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'الآية ${currentIndex + 1}',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: theme.colorScheme.onSurface.withOpacity(
+                                  0.5,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              '$totalVerses آية',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: theme.colorScheme.onSurface.withOpacity(
+                                  0.5,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  );
+                },
               );
             },
           ),

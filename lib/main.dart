@@ -13,6 +13,7 @@ import 'PrayerTime.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'services/notification_service.dart';
+import 'services/audio_handler.dart';
 import 'package:alarm/alarm.dart';
 
 void main() async {
@@ -21,6 +22,7 @@ void main() async {
   // تهيئة الإشعارات العادية والمنبه
   await NotificationService.initialize();
   await Alarm.init();
+  await initAudioService();
 
   final appProvider = AppProvider();
   await appProvider.loadAppState();

@@ -26,6 +26,7 @@ class _PrayerTimesPageState extends State<PrayerTimesPage>
   bool _isLoading = true;
   String? _errorMessage;
   Timer? _timer;
+  bool _notificationsEnabled = true;
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
 
@@ -48,10 +49,79 @@ class _PrayerTimesPageState extends State<PrayerTimesPage>
   }
 
   Future<void> _initializeApp() async {
+    await _loadNotificationPreference();
     await _checkConnectivity();
     await _loadPrayerTimes();
     _startTimer();
     _animController.forward();
+  }
+
+  Future<void> _loadNotificationPreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _notificationsEnabled = prefs.getBool('adhan_notifications_enabled') ?? true;
+    });
+  }
+
+  Future<void> _toggleNotifications() async {
+    final newValue = !_notificationsEnabled;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('adhan_notifications_enabled', newValue);
+    if (!mounted) return;
+    setState(() {
+      _notificationsEnabled = newValue;
+    });
+
+    if (!newValue) {
+      // Cancel all scheduled adhan notifications
+      await NotificationService.cancelAllNotifications();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'تم إيقاف إشعارات الأذان',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16),
+            ),
+            backgroundColor: Colors.orange.shade700,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } else {
+      // Re-schedule notifications if prayer times are loaded
+      if (_prayerTimes != null) {
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final lat = prefs.getDouble('last_lat');
+          final lng = prefs.getDouble('last_lng');
+          if (lat != null && lng != null) {
+            final coordinates = Coordinates(lat, lng);
+            final params = CalculationMethod.umm_al_qura.getParameters();
+            params.madhab = Madhab.shafi;
+            _scheduleNotificationsForNextDays(coordinates, params);
+          }
+        } catch (_) {}
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'تم تفعيل إشعارات الأذان',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16),
+            ),
+            backgroundColor: const Color(0xFF0D9488),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _checkConnectivity() async {
@@ -147,7 +217,9 @@ class _PrayerTimesPageState extends State<PrayerTimesPage>
         _calculateCurrentPrayer();
       });
 
-      _scheduleNotificationsForNextDays(coordinates, params);
+      if (_notificationsEnabled) {
+        _scheduleNotificationsForNextDays(coordinates, params);
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -441,6 +513,29 @@ class _PrayerTimesPageState extends State<PrayerTimesPage>
                               setState(() => _isLoading = true);
                               _loadPrayerTimes();
                             },
+                          ),
+                          const SizedBox(width: 4),
+                          GestureDetector(
+                            onTap: _toggleNotifications,
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 300),
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: _notificationsEnabled
+                                    ? Colors.white.withOpacity(0.2)
+                                    : Colors.red.withOpacity(0.3),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Icon(
+                                _notificationsEnabled
+                                    ? Icons.notifications_active_rounded
+                                    : Icons.notifications_off_rounded,
+                                color: _notificationsEnabled
+                                    ? Colors.white
+                                    : Colors.red.shade200,
+                                size: 22,
+                              ),
+                            ),
                           ),
                         ],
                       ),
